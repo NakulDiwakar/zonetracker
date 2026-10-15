@@ -1,0 +1,23 @@
+name: Update zones
+on:
+  schedule:
+    - cron: "30 12 * * 1-5"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install yfinance pandas numpy
+      - run: python build_zones.py 500
+      - run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add zones.json
+          git commit -m "Update zones" || echo "No changes"
+          git push
