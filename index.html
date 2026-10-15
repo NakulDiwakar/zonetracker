@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Zone Proximity Tracker</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{--bg:#eef1f5;--panel:#fff;--ink:#16202c;--mute:#5c6b7c;--line:#d6dde6;--dem:#0f7b5f;--demBg:#dff3ec;--sup:#b3382c;--supBg:#fbe5e1;--acc:#27456b;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#0e141b;--panel:#161e28;--ink:#e6edf5;--mute:#93a1b2;--line:#263242;--dem:#4cc9a0;--demBg:#12332b;--sup:#ff8a7a;--supBg:#3a1b18;--acc:#8fb4e8}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#0e141b;--panel:#161e28;--ink:#e6edf5;--mute:#93a1b2;--line:#263242;--dem:#4cc9a0;--demBg:#12332b;--sup:#ff8a7a;--supBg:#3a1b18;--acc:#8fb4e8}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.5 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:1040px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:26px;line-height:1.2;margin:8px 0 4px;font-weight:600;letter-spacing:-.01em}
+.lede{color:var(--mute);margin:0 0 16px;max-width:60ch}
+.bar{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-bottom:12px}
+.btn{display:inline-block;background:var(--acc);color:var(--panel);padding:8px 14px;border-radius:6px;font-weight:500;cursor:pointer}
+.btn:focus-within{outline:2px solid var(--ink);outline-offset:2px}
+.btn input{position:absolute;opacity:0;width:1px;height:1px}
+#msg{color:var(--mute);font-size:14px}
+.filters{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px;display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin-bottom:12px}
+.filters label,.filters .lbl{display:block;font-size:13px;color:var(--mute);margin-bottom:4px}
+.filters select,.filters input[type=search]{width:100%;padding:7px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit}
+.filters input[type=range]{width:100%}
+.tfs{display:flex;flex-wrap:wrap;gap:6px}
+.tfs label{display:inline-flex;gap:5px;align-items:center;margin:0;padding:4px 9px;border:1px solid var(--line);border-radius:999px;color:var(--ink);cursor:pointer}
+.tfs input:checked+span{font-weight:600}
+.wrap{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;min-width:760px}
+th,td{padding:9px 10px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top;white-space:nowrap}
+th{font-weight:500;color:var(--mute);font-size:13px}
+tr:last-child td{border-bottom:0}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+td.s{font-weight:600}
+.tag{padding:2px 8px;border-radius:4px;font-size:13px;font-weight:500}
+.tag.D{background:var(--demBg);color:var(--dem)}.tag.S{background:var(--supBg);color:var(--sup)}
+td.c b{display:block;font-variant-numeric:tabular-nums}
+td.c small{color:var(--mute);font-variant-numeric:tabular-nums}
+td.c.D b{color:var(--dem)}td.c.S b{color:var(--sup)}
+.none{color:var(--mute)}
+.empty{padding:28px 16px;text-align:center;color:var(--mute)}
+.note{color:var(--mute);font-size:13px;margin-top:12px;max-width:70ch}
+</style>
+</head>
+<body>
+<main>
+<h1>Zone Proximity Tracker</h1>
+<p class="lede">Stocks sitting close to a fresh demand or supply zone on the daily, weekly, monthly, quarterly and half-yearly charts.</p>
+<div class="bar">
+<label class="btn">Load zones.json<input type="file" id="f" accept=".json,application/json"></label>
+<span id="msg"></span>
+</div>
+<section class="filters" aria-label="Filters">
+<div><span class="lbl">Timeframes</span><div class="tfs" id="tfs"></div></div>
+<div><label for="side">Zone type</label><select id="side"><option value="B">Demand and supply</option><option value="D">Demand only</option><option value="S">Supply only</option></select></div>
+<div><label for="th">Within <b id="thv"></b> of the zone</label><input type="range" id="th" min="0.5" max="10" step="0.5" value="3"></div>
+<div><label for="minc">Timeframes that must match</label><select id="minc"><option value="1">At least 1</option><option value="2">At least 2</option><option value="3">At least 3</option></select></div>
+<div><label for="q">Search stock</label><input type="search" id="q" placeholder="e.g. RELIANCE"></div>
+</section>
+<div class="wrap"><table><thead><tr><th>Stock</th><th class="n">Price</th><th>Zone</th><th>Daily</th><th>Weekly</th><th>Monthly</th><th>Quarterly</th><th>Half-yearly</th><th class="n">Matches</th></tr></thead><tbody id="rows"></tbody></table><div id="empty" class="empty" hidden>No stock is within that distance. Widen the distance or select more timeframes.</div></div>
+<p class="note">Distance is measured from the current price to the zone's entry edge: the top of a demand zone, the bottom of a supply zone. Only fresh zones count, meaning price has not touched or closed through them. Each cell shows the distance and the zone range.</p>
+</main>
+<script>
+const $=s=>document.querySelector(s);
+const TF=["D","W","M","Q","H"],NM={D:"Daily",W:"Weekly",M:"Monthly",Q:"Quarterly",H:"Half-yearly"};
+const sel=new Set(TF);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const sample={universe:"Sample data",generated:"fictional numbers, load your own file",stocks:[
+{s:"DEMO ALPHA",p:1000,z:[["D","D",985,970],["W","D",972,940],["M","D",962,900],["D","S",1030,1022]]},
+{s:"DEMO BETA",p:250,z:[["D","S",255,252],["W","S",258,253],["Q","S",262,255],["H","D",200,180]]},
+{s:"DEMO GAMMA",p:540,z:[["D","D",530,520],["H","D",528,470],["W","S",600,585]]},
+{s:"DEMO DELTA",p:88,z:[["M","S",90,88.4],["Q","S",93,89],["D","D",70,66]]}]};
+let data=sample;
+try{const s=localStorage.getItem("zt");if(s){const d=JSON.parse(s);if(d&&Array.isArray(d.stocks))data=d}}catch(e){}
+$("#tfs").innerHTML=TF.map(t=>`<label><input type="checkbox" value="${t}" checked><span>${NM[t]}</span></label>`).join("");
+$("#tfs").addEventListener("change",e=>{e.target.checked?sel.add(e.target.value):sel.delete(e.target.value);render()});
+["side","th","minc","q"].forEach(id=>$("#"+id).addEventListener("input",render));
+$("#f").addEventListener("change",e=>{
+ const f=e.target.files[0];if(!f)return;
+ f.text().then(t=>{try{const d=JSON.parse(t);if(!Array.isArray(d.stocks))throw 0;data=d;try{localStorage.setItem("zt",JSON.stringify(d))}catch(x){}render()}
+ catch(x){$("#msg").textContent="That file is not a zones.json made by build_zones.py."}});
+});
+function render(){
+ const th=+$("#th").value,side=$("#side").value,minc=+$("#minc").value,q=$("#q").value.trim().toLowerCase();
+ $("#thv").textContent=th.toFixed(1)+"%";
+ $("#msg").textContent=data.universe+", updated "+data.generated+", "+data.stocks.length+" stocks";
+ const rows=[];
+ for(const st of data.stocks){
+  if(q&&!st.s.toLowerCase().includes(q))continue;
+  for(const sd of ["D","S"]){
+   if(side!=="B"&&side!==sd)continue;
+   const hits={};
+   for(const [tf,s,top,bot] of st.z){
+    if(s!==sd||!sel.has(tf))continue;
+    const d=sd==="D"?(st.p-top)/st.p*100:(bot-st.p)/st.p*100;
+    if(d>=0&&d<=th)hits[tf]={d,top,bot};
+   }
+   const n=Object.keys(hits).length;
+   if(n>0&&n>=minc)rows.push({st,sd,hits,n,near:Math.min(...Object.values(hits).map(h=>h.d))});
+  }
+ }
+ rows.sort((a,b)=>b.n-a.n||a.near-b.near);
+ $("#rows").innerHTML=rows.map(r=>`<tr><td class="s">${esc(r.st.s)}</td><td class="n">${r.st.p.toFixed(2)}</td><td><span class="tag ${r.sd}">${r.sd==="D"?"Demand":"Supply"}</span></td>`+
+  TF.map(t=>{const h=r.hits[t];return h?`<td class="c ${r.sd}"><b>${h.d.toFixed(1)}%</b><small>${h.bot}–${h.top}</small></td>`:`<td class="none">–</td>`}).join("")+
+  `<td class="n">${r.n}</td></tr>`).join("");
+ $("#empty").hidden=rows.length>0;
+}
+fetch("zones.json",{cache:"no-store"}).then(r=>r.ok?r.json():Promise.reject()).then(d=>{if(d&&Array.isArray(d.stocks)){data=d;render()}}).catch(()=>{});
+render();
+</script>
+</body>
+</html>
