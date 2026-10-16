@@ -1,7 +1,7 @@
 name: Update zones
 on:
   schedule:
-    - cron: "30 12 * * 1-5"
+    - cron: "30 14 * * 1-5"
   workflow_dispatch:
 permissions:
   contents: write
@@ -14,7 +14,7 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install yfinance pandas numpy
-      - run: python build_zones.py 500
+      - run: python build_zones.py
       - run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
