@@ -58,6 +58,7 @@ td.c.D b{color:var(--dem)}td.c.S b{color:var(--sup)}
 <div><label for="side">Zone type</label><select id="side"><option value="B">Demand and supply</option><option value="D">Demand only</option><option value="S">Supply only</option></select></div>
 <div><label for="th">Within <b id="thv"></b> of the zone</label><input type="range" id="th" min="0.5" max="10" step="0.5" value="3"></div>
 <div><label for="minc">Timeframes that must match</label><select id="minc"><option value="1">At least 1</option><option value="2">At least 2</option><option value="3">At least 3</option></select></div>
+<div><label for="ix">Index</label><select id="ix"></select></div>
 <div><label for="q">Search stock</label><input type="search" id="q" placeholder="e.g. RELIANCE"></div>
 </section>
 <div class="wrap"><table><thead><tr><th>Stock</th><th class="n">Price</th><th>Zone</th><th>Daily</th><th>Weekly</th><th>Monthly</th><th>Quarterly</th><th>Half-yearly</th><th class="n">Matches</th></tr></thead><tbody id="rows"></tbody></table><div id="empty" class="empty" hidden>No stock is within that distance. Widen the distance or select more timeframes.</div></div>
@@ -77,19 +78,26 @@ let data=sample;
 try{const s=localStorage.getItem("zt");if(s){const d=JSON.parse(s);if(d&&Array.isArray(d.stocks))data=d}}catch(e){}
 $("#tfs").innerHTML=TF.map(t=>`<label><input type="checkbox" value="${t}" checked><span>${NM[t]}</span></label>`).join("");
 $("#tfs").addEventListener("change",e=>{e.target.checked?sel.add(e.target.value):sel.delete(e.target.value);render()});
-["side","th","minc","q"].forEach(id=>$("#"+id).addEventListener("input",render));
+["side","th","minc","q","ix"].forEach(id=>$("#"+id).addEventListener("input",render));
 $("#f").addEventListener("change",e=>{
  const f=e.target.files[0];if(!f)return;
  f.text().then(t=>{try{const d=JSON.parse(t);if(!Array.isArray(d.stocks))throw 0;data=d;try{localStorage.setItem("zt",JSON.stringify(d))}catch(x){}render()}
  catch(x){$("#msg").textContent="That file is not a zones.json made by build_zones.py."}});
 });
+function fillIx(){
+ const cur=$("#ix").value,ix=data.indices||{};
+ $("#ix").innerHTML='<option value="">All stocks</option>'+Object.entries(ix).map(([c,n])=>`<option value="${c}">${esc(n)}</option>`).join("");
+ $("#ix").value=cur;fillIx.k=data;
+}
 function render(){
- const th=+$("#th").value,side=$("#side").value,minc=+$("#minc").value,q=$("#q").value.trim().toLowerCase();
+ if(fillIx.k!==data)fillIx();
+ const th=+$("#th").value,side=$("#side").value,minc=+$("#minc").value,q=$("#q").value.trim().toLowerCase(),ix=$("#ix").value;
  $("#thv").textContent=th.toFixed(1)+"%";
- $("#msg").textContent=data.universe+", updated "+data.generated+", "+data.stocks.length+" stocks";
+ $("#msg").textContent=data.universe+", prices as of "+(data.asof||data.generated)+", "+data.stocks.length+" stocks";
  const rows=[];
  for(const st of data.stocks){
   if(q&&!st.s.toLowerCase().includes(q))continue;
+  if(ix&&!(st.i||[]).includes(ix))continue;
   for(const sd of ["D","S"]){
    if(side!=="B"&&side!==sd)continue;
    const hits={};
@@ -103,7 +111,7 @@ function render(){
   }
  }
  rows.sort((a,b)=>b.n-a.n||a.near-b.near);
- $("#rows").innerHTML=rows.map(r=>`<tr><td class="s">${esc(r.st.s)}</td><td class="n">${r.st.p.toFixed(2)}</td><td><span class="tag ${r.sd}">${r.sd==="D"?"Demand":"Supply"}</span></td>`+
+ $("#rows").innerHTML=rows.map(r=>`<tr><td class="s">${esc(r.st.s)}</td><td class="n">${r.st.p.toFixed(2)}${r.st.d&&data.asof&&r.st.d<data.asof?`<small class="none" title="Last price from ${r.st.d}"> *</small>`:""}</td><td><span class="tag ${r.sd}">${r.sd==="D"?"Demand":"Supply"}</span></td>`+
   TF.map(t=>{const h=r.hits[t];return h?`<td class="c ${r.sd}"><b>${h.d.toFixed(1)}%</b><small>${h.bot}–${h.top}</small></td>`:`<td class="none">–</td>`}).join("")+
   `<td class="n">${r.n}</td></tr>`).join("");
  $("#empty").hidden=rows.length>0;
