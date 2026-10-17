@@ -41,6 +41,8 @@ td.c b{display:block;font-variant-numeric:tabular-nums}
 td.c small{color:var(--mute);font-variant-numeric:tabular-nums}
 td.c.D b{color:var(--dem)}td.c.S b{color:var(--sup)}
 .none{color:var(--mute)}
+.bd{font-style:normal;font-size:11px;font-weight:500;padding:1px 5px;border-radius:4px;background:var(--line);color:var(--ink);margin-left:3px}
+.sub{display:block;font-weight:400;font-size:12px;color:var(--mute)}
 .empty{padding:28px 16px;text-align:center;color:var(--mute)}
 .note{color:var(--mute);font-size:13px;margin-top:12px;max-width:70ch}
 </style>
@@ -59,10 +61,13 @@ td.c.D b{color:var(--dem)}td.c.S b{color:var(--sup)}
 <div><label for="th">Within <b id="thv"></b> of the zone</label><input type="range" id="th" min="0.5" max="10" step="0.5" value="3"></div>
 <div><label for="minc">Timeframes that must match</label><select id="minc"><option value="1">At least 1</option><option value="2">At least 2</option><option value="3">At least 3</option></select></div>
 <div><label for="ix">Index</label><select id="ix"></select></div>
+<div><label for="st">Zone status</label><select id="st"><option value="F">Approaching (not touched yet)</option><option value="I">Inside now (being tested)</option><option value="A">Both</option></select></div>
+<div><label for="chg">What changed since yesterday</label><select id="chg"><option value="">Show all</option><option value="N">New zones only</option><option value="C">Got closer only</option><option value="NC">New or got closer</option></select></div>
+<div><label for="liq">Minimum daily traded value</label><select id="liq"><option value="0">Any</option><option value="1">Rs 1 crore</option><option value="5">Rs 5 crore</option><option value="20">Rs 20 crore</option><option value="50">Rs 50 crore</option></select></div>
 <div><label for="q">Search stock</label><input type="search" id="q" placeholder="e.g. RELIANCE"></div>
 </section>
 <div class="wrap"><table><thead><tr><th>Stock</th><th class="n">Price</th><th>Zone</th><th>Daily</th><th>Weekly</th><th>Monthly</th><th>Quarterly</th><th>Half-yearly</th><th class="n">Matches</th></tr></thead><tbody id="rows"></tbody></table><div id="empty" class="empty" hidden>No stock is within that distance. Widen the distance or select more timeframes.</div></div>
-<p class="note">Distance is measured from the current price to the zone's entry edge: the top of a demand zone, the bottom of a supply zone. Only fresh zones count, meaning price has not touched or closed through them. Each cell shows the distance and the zone range.</p>
+<p class="note">Distance is measured from the current price to the zone's entry edge: the top of a demand zone, the bottom of a supply zone. Approaching zones are fresh, meaning price has not touched them yet. Inside means the latest candle has just entered the zone. New and Closer compare with the previous trading day. Each cell shows the distance and the zone range.</p>
 </main>
 <script>
 const $=s=>document.querySelector(s);
@@ -78,7 +83,7 @@ let data=sample;
 try{const s=localStorage.getItem("zt");if(s){const d=JSON.parse(s);if(d&&Array.isArray(d.stocks))data=d}}catch(e){}
 $("#tfs").innerHTML=TF.map(t=>`<label><input type="checkbox" value="${t}" checked><span>${NM[t]}</span></label>`).join("");
 $("#tfs").addEventListener("change",e=>{e.target.checked?sel.add(e.target.value):sel.delete(e.target.value);render()});
-["side","th","minc","q","ix"].forEach(id=>$("#"+id).addEventListener("input",render));
+["side","th","minc","q","ix","st","chg","liq"].forEach(id=>$("#"+id).addEventListener("input",render));
 $("#f").addEventListener("change",e=>{
  const f=e.target.files[0];if(!f)return;
  f.text().then(t=>{try{const d=JSON.parse(t);if(!Array.isArray(d.stocks))throw 0;data=d;try{localStorage.setItem("zt",JSON.stringify(d))}catch(x){}render()}
@@ -91,28 +96,32 @@ function fillIx(){
 }
 function render(){
  if(fillIx.k!==data)fillIx();
- const th=+$("#th").value,side=$("#side").value,minc=+$("#minc").value,q=$("#q").value.trim().toLowerCase(),ix=$("#ix").value;
+ const th=+$("#th").value,side=$("#side").value,minc=+$("#minc").value,q=$("#q").value.trim().toLowerCase(),ix=$("#ix").value,stv=$("#st").value,chg=$("#chg").value,liq=+$("#liq").value;
  $("#thv").textContent=th.toFixed(1)+"%";
  $("#msg").textContent=data.universe+", prices as of "+(data.asof||data.generated)+", "+data.stocks.length+" stocks";
  const rows=[];
  for(const st of data.stocks){
   if(q&&!st.s.toLowerCase().includes(q))continue;
   if(ix&&!(st.i||[]).includes(ix))continue;
+  if(liq&&(st.v||0)<liq)continue;
   for(const sd of ["D","S"]){
    if(side!=="B"&&side!==sd)continue;
    const hits={};
-   for(const [tf,s,top,bot] of st.z){
+   for(const [tf,s,top,bot,sx,fl] of st.z){
     if(s!==sd||!sel.has(tf))continue;
-    const d=sd==="D"?(st.p-top)/st.p*100:(bot-st.p)/st.p*100;
-    if(d>=0&&d<=th)hits[tf]={d,top,bot};
+    const inside=sx==="I";
+    if((stv==="F"&&inside)||(stv==="I"&&!inside))continue;
+    if((chg==="N"&&fl!=="N")||(chg==="C"&&fl!=="C")||(chg==="NC"&&!fl))continue;
+    const d=inside?0:(sd==="D"?(st.p-top)/st.p*100:(bot-st.p)/st.p*100);
+    if(d>=0&&d<=th&&(!hits[tf]||d<hits[tf].d))hits[tf]={d,top,bot,inside,fl};
    }
    const n=Object.keys(hits).length;
    if(n>0&&n>=minc)rows.push({st,sd,hits,n,near:Math.min(...Object.values(hits).map(h=>h.d))});
   }
  }
  rows.sort((a,b)=>b.n-a.n||a.near-b.near);
- $("#rows").innerHTML=rows.map(r=>`<tr><td class="s">${esc(r.st.s)}</td><td class="n">${r.st.p.toFixed(2)}${r.st.d&&data.asof&&r.st.d<data.asof?`<small class="none" title="Last price from ${r.st.d}"> *</small>`:""}</td><td><span class="tag ${r.sd}">${r.sd==="D"?"Demand":"Supply"}</span></td>`+
-  TF.map(t=>{const h=r.hits[t];return h?`<td class="c ${r.sd}"><b>${h.d.toFixed(1)}%</b><small>${h.bot}–${h.top}</small></td>`:`<td class="none">–</td>`}).join("")+
+ $("#rows").innerHTML=rows.map(r=>`<tr><td class="s">${esc(r.st.s)}${r.st.v?`<span class="sub">Rs ${r.st.v} Cr/day</span>`:""}</td><td class="n">${r.st.p.toFixed(2)}${r.st.d&&data.asof&&r.st.d<data.asof?`<small class="none" title="Last price from ${r.st.d}"> *</small>`:""}</td><td><span class="tag ${r.sd}">${r.sd==="D"?"Demand":"Supply"}</span></td>`+
+  TF.map(t=>{const h=r.hits[t];return h?`<td class="c ${r.sd}"><b>${h.inside?"Inside":h.d.toFixed(1)+"%"}${h.fl==="N"?'<i class="bd">New</i>':h.fl==="C"?'<i class="bd">Closer</i>':""}</b><small>${h.bot}–${h.top}</small></td>`:`<td class="none">–</td>`}).join("")+
   `<td class="n">${r.n}</td></tr>`).join("");
  $("#empty").hidden=rows.length>0;
 }
