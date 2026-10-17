@@ -9,7 +9,8 @@ Timeframes: D, W, M, Q = calendar quarter, H = calendar half-year.
 
 For each stock and timeframe the file lists:
   fresh zone  (st "F") - the nearest zone price has not touched yet
-  inside zone (st "I") - a zone the latest candle has just entered (being tested now)
+  inside zone (st "I") - a zone the latest price is sitting in right now. A zone that was only touched by a
+                         wick and then left behind (price bounced away) is NOT shown: it has done its work.
 Each zone also gets a flag: "N" new since the previous trading day, "C" got closer, or "".
 Each stock gets "v", its average daily traded value in rupee crore over the last 20 days.
 """
@@ -72,9 +73,9 @@ def engine(o, h, l, c):
     dz, sz, lastD, lastS = [], [], -1, -1
     din, sin_ = [], []
     for i in range(first, n):
-        if i == n - 1:      # zones fresh until now that the latest candle has entered but not broken
-            din = [z for z in dz if l[i] <= z[0] and c[i] >= z[1]]
-            sin_ = [z for z in sz if h[i] >= z[1] and c[i] <= z[0]]
+        if i == n - 1:      # zones fresh until now where the latest price is sitting inside the zone range
+            din = [z for z in dz if z[1] <= c[i] <= z[0]]
+            sin_ = [z for z in sz if z[1] <= c[i] <= z[0]]
         dz = [z for z in dz if not (c[i] < z[1] or l[i] <= z[0])]
         sz = [z for z in sz if not (c[i] > z[0] or h[i] >= z[1])]
 
