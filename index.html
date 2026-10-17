@@ -57,6 +57,7 @@ td.c.D b{color:var(--dem)}td.c.S b{color:var(--sup)}
 </div>
 <section class="filters" aria-label="Filters">
 <div><span class="lbl">Timeframes</span><div class="tfs" id="tfs"></div></div>
+<div><span class="lbl">Zone types (untick to hide)</span><div class="tfs" id="tys"></div></div>
 <div><label for="side">Zone type</label><select id="side"><option value="B">Demand and supply</option><option value="D">Demand only</option><option value="S">Supply only</option></select></div>
 <div><label for="th">Within <b id="thv"></b> of the zone</label><input type="range" id="th" min="0.5" max="10" step="0.5" value="3"></div>
 <div><label for="minc">Timeframes that must match</label><select id="minc"><option value="1">At least 1</option><option value="2">At least 2</option><option value="3">At least 3</option></select></div>
@@ -73,6 +74,8 @@ td.c.D b{color:var(--dem)}td.c.S b{color:var(--sup)}
 const $=s=>document.querySelector(s);
 const TF=["D","W","M","Q","H"],NM={D:"Daily",W:"Weekly",M:"Monthly",Q:"Quarterly",H:"Half-yearly"};
 const sel=new Set(TF);
+const TY={S:"Single candle",M:"Multi-candle legout",C:"Multi-base (continuation)",G:"Gap"},TS={S:"single",M:"multi-candle",C:"multi-base",G:"gap"};
+const typ=new Set(Object.keys(TY));
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const sample={universe:"Sample data",generated:"fictional numbers, load your own file",stocks:[
 {s:"DEMO ALPHA",p:1000,z:[["D","D",985,970],["W","D",972,940],["M","D",962,900],["D","S",1030,1022]]},
@@ -83,6 +86,8 @@ let data=sample;
 try{const s=localStorage.getItem("zt");if(s){const d=JSON.parse(s);if(d&&Array.isArray(d.stocks))data=d}}catch(e){}
 $("#tfs").innerHTML=TF.map(t=>`<label><input type="checkbox" value="${t}" checked><span>${NM[t]}</span></label>`).join("");
 $("#tfs").addEventListener("change",e=>{e.target.checked?sel.add(e.target.value):sel.delete(e.target.value);render()});
+$("#tys").innerHTML=Object.entries(TY).map(([k,n])=>`<label><input type="checkbox" value="${k}" checked><span>${n}</span></label>`).join("");
+$("#tys").addEventListener("change",e=>{e.target.checked?typ.add(e.target.value):typ.delete(e.target.value);render()});
 ["side","th","minc","q","ix","st","chg","liq"].forEach(id=>$("#"+id).addEventListener("input",render));
 $("#f").addEventListener("change",e=>{
  const f=e.target.files[0];if(!f)return;
@@ -107,13 +112,14 @@ function render(){
   for(const sd of ["D","S"]){
    if(side!=="B"&&side!==sd)continue;
    const hits={};
-   for(const [tf,s,top,bot,sx,fl] of st.z){
+   for(const [tf,s,top,bot,sx,fl,ty] of st.z){
     if(s!==sd||!sel.has(tf))continue;
+    if(ty&&!typ.has(ty))continue;
     const inside=sx==="I";
     if((stv==="F"&&inside)||(stv==="I"&&!inside))continue;
     if((chg==="N"&&fl!=="N")||(chg==="C"&&fl!=="C")||(chg==="NC"&&!fl))continue;
     const d=inside?0:(sd==="D"?(st.p-top)/st.p*100:(bot-st.p)/st.p*100);
-    if(d>=0&&d<=th&&(!hits[tf]||d<hits[tf].d))hits[tf]={d,top,bot,inside,fl};
+    if(d>=0&&d<=th&&(!hits[tf]||d<hits[tf].d))hits[tf]={d,top,bot,inside,fl,ty};
    }
    const n=Object.keys(hits).length;
    if(n>0&&n>=minc)rows.push({st,sd,hits,n,near:Math.min(...Object.values(hits).map(h=>h.d))});
@@ -121,7 +127,7 @@ function render(){
  }
  rows.sort((a,b)=>b.n-a.n||a.near-b.near);
  $("#rows").innerHTML=rows.map(r=>`<tr><td class="s">${esc(r.st.s)}${r.st.v?`<span class="sub">Rs ${r.st.v} Cr/day</span>`:""}</td><td class="n">${r.st.p.toFixed(2)}${r.st.d&&data.asof&&r.st.d<data.asof?`<small class="none" title="Last price from ${r.st.d}"> *</small>`:""}</td><td><span class="tag ${r.sd}">${r.sd==="D"?"Demand":"Supply"}</span></td>`+
-  TF.map(t=>{const h=r.hits[t];return h?`<td class="c ${r.sd}"><b>${h.inside?"Inside":h.d.toFixed(1)+"%"}${h.fl==="N"?'<i class="bd">New</i>':h.fl==="C"?'<i class="bd">Closer</i>':""}</b><small>${h.bot}–${h.top}</small></td>`:`<td class="none">–</td>`}).join("")+
+  TF.map(t=>{const h=r.hits[t];return h?`<td class="c ${r.sd}"><b>${h.inside?"Inside":h.d.toFixed(1)+"%"}${h.fl==="N"?'<i class="bd">New</i>':h.fl==="C"?'<i class="bd">Closer</i>':""}</b><small>${h.bot}–${h.top}${h.ty?" "+TS[h.ty]:""}</small></td>`:`<td class="none">–</td>`}).join("")+
   `<td class="n">${r.n}</td></tr>`).join("");
  $("#empty").hidden=rows.length>0;
 }

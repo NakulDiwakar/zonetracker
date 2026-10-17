@@ -59,7 +59,7 @@ def agg(df, tf):
 def engine(o, h, l, c):
     """Runs the indicator's zone rules candle by candle.
     Returns fresh demand zones, fresh supply zones, demand zones being tested by the latest candle,
-    supply zones being tested by the latest candle, and the last close. Zones are (top, bottom)."""
+    supply zones being tested by the latest candle, and the last close. Zones are (top, bottom, type): S single candle, M multi-candle legout, C multi-base continuation, G gap."""
     n = len(c)
     first = max(MULTI_MAX, CONT_MAX + LEG_BARS) + 3
     if n < first + 2:
@@ -122,21 +122,21 @@ def engine(o, h, l, c):
         sMulti = bearLen > 0 and not bearImp and (i - bearLen) != lastS
 
         if cBull:
-            dz.append(cd); lastD = i - 1
+            dz.append((cd[0], cd[1], "C")); lastD = i - 1
         elif bullImp:
-            dz.append((max(o[i - 1], c[i - 1]), l[i - 1])); lastD = i - 1
+            dz.append((max(o[i - 1], c[i - 1]), l[i - 1], "S")); lastD = i - 1
         elif dMulti:
-            j = i - bullLen; dz.append((max(o[j], c[j]), l[j])); lastD = j
+            j = i - bullLen; dz.append((max(o[j], c[j]), l[j], "M")); lastD = j
         elif gapUp:
-            dz.append((max(o[i - 1], c[i - 1]), l[i - 1])); lastD = i - 1
+            dz.append((max(o[i - 1], c[i - 1]), l[i - 1], "G")); lastD = i - 1
         if cBear:
-            sz.append(cs); lastS = i - 1
+            sz.append((cs[0], cs[1], "C")); lastS = i - 1
         elif bearImp:
-            sz.append((h[i - 1], min(o[i - 1], c[i - 1]))); lastS = i - 1
+            sz.append((h[i - 1], min(o[i - 1], c[i - 1]), "S")); lastS = i - 1
         elif sMulti:
-            j = i - bearLen; sz.append((h[j], min(o[j], c[j]))); lastS = j
+            j = i - bearLen; sz.append((h[j], min(o[j], c[j]), "M")); lastS = j
         elif gapDn:
-            sz.append((h[i - 1], min(o[i - 1], c[i - 1]))); lastS = i - 1
+            sz.append((h[i - 1], min(o[i - 1], c[i - 1]), "G")); lastS = i - 1
         dz, sz = dz[-MAX_ZONES:], sz[-MAX_ZONES:]
     return dz, sz, din, sin_, c[-1]
 
@@ -144,16 +144,19 @@ def engine(o, h, l, c):
 def pick(dz, sz, din, sin_, c0):
     """The nearest fresh zone on each side, plus the nearest zone being tested now on each side."""
     out = []
-    fd = [z for z in dz if z[0] < c0]
-    fs = [z for z in sz if z[1] > c0]
-    if fd:
-        out.append(("D", max(fd), "F"))
-    if fs:
-        out.append(("S", min(fs, key=lambda q: q[1]), "F"))
-    if din:
-        out.append(("D", max(din), "I"))
-    if sin_:
-        out.append(("S", min(sin_, key=lambda q: q[1]), "I"))
+    for ty in "SMCG":          # one nearest zone per zone type, so the page can switch types on and off
+        fd = [z for z in dz if z[2] == ty and z[0] < c0]
+        fs = [z for z in sz if z[2] == ty and z[1] > c0]
+        idn = [z for z in din if z[2] == ty]
+        isn = [z for z in sin_ if z[2] == ty]
+        if fd:
+            out.append(("D", max(fd), "F"))
+        if fs:
+            out.append(("S", min(fs, key=lambda q: q[1]), "F"))
+        if idn:
+            out.append(("D", max(idn), "I"))
+        if isn:
+            out.append(("S", min(isn, key=lambda q: q[1]), "I"))
     return out
 
 
@@ -221,7 +224,7 @@ def main():
                     continue
                 dz, sz, din, sin_, c0 = engine(*[x[c].values for c in COLS])
                 for side, z, st in pick(dz, sz, din, sin_, c0):
-                    zl.append([tf, side, round(float(z[0]), 2), round(float(z[1]), 2), st])
+                    zl.append([tf, side, round(float(z[0]), 2), round(float(z[1]), 2), st, "", z[2]])
             v = round(float((d["Close"] * d["Volume"]).tail(20).mean() / 1e7), 2)
             out.append({"s": s_, "p": round(float(d["Close"].iloc[-1]), 2), "d": d.index[-1].date().isoformat(),
                         "v": v, "i": codes[s_], "z": zl})
@@ -254,7 +257,7 @@ def main():
                     fl = "N"
                 elif prevz[key] - dist(rec["p"], z[1], z[2], z[3], z[4]) >= CLOSER_PCT:
                     fl = "C"
-            z.append(fl)
+            z[5] = fl
 
     with open("zones.json", "w") as f:
         json.dump({"universe": "NSE stocks", "generated": dt.datetime.now().isoformat(timespec="minutes"),
