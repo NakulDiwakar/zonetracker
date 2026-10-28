@@ -3,8 +3,9 @@
 Setup:  pip install yfinance pandas numpy
 Run:    python build_zones.py          (about 750 stocks, tagged by index)
 
-Zone rules are the same as your TradingView indicator: single base + explosive candle, multi-candle
-legout, continuation zones (rally-base-rally / drop-base-drop), gap zones, and long-wick base candles.
+Zone rules match your Pine indicator on Dhan: single base + explosive candle, multi-candle
+legout, continuation zones (rally-base-rally / drop-base-drop), gap zones, long-wick base candles, the base
+shape rule, the legout-must-close-beyond-legin rule, and the exceptional far-edge marking.
 Timeframes: D, W, M, Q = calendar quarter, H = calendar half-year.
 
 For each stock and timeframe the file lists:
@@ -37,7 +38,14 @@ USE_WICK, WICK_PCT, WICK_RNG = True, 0.35, 1.5
 USE_MULTI, MULTI_MAX, MULTI_MULT, MULTI_MIN_BODY = True, 3, 1.5, 0.3
 USE_CONT, CONT_MAX, CONT_NEED_LEG, LEG_BARS, LEG_MULT, CONT_HEIGHT = True, 3, True, 3, 1.5, 2.5
 USE_GAPS, GAP_MULT, GAP_NEED_BASE = True, 0.3, False
-MAX_ZONES = 60
+# ---- rules added to match the Pine indicator (Dhan) ----
+USE_SHAPE, SHAPE_PCT = True, 0.50             # a base candle's body may be at most this share of its range
+USE_CLOSE, CLOSE_FULL_RANGE = True, False     # the legout must close beyond the legin (body, or wick to wick if True)
+USE_EXC = True                                # far edge reaches a legin / legout wick that goes beyond the base
+# newest zones kept per side. The indicator keeps 100 on the chart's own timeframe and 10 per higher timeframe.
+# Set W, M, Q, H to 100 if you also want to see older untouched zones the chart no longer draws.
+MAX_PER_TF = {"D": 100, "W": 10, "M": 10, "Q": 10, "H": 10}
+RULES_VERSION = "3"                           # changes when the zone rules change, so old "new / closer" flags are not compared
 KEEP = {"D": 1500, "W": 600, "M": 400, "Q": 200, "H": 100}   # newest candles used per timeframe
 CLOSER_PCT = 0.2          # "got closer" = at least this many % points nearer than the previous day
 COLS = ["Open", "High", "Low", "Close"]
@@ -61,7 +69,7 @@ def agg(df, tf):
     return g.agg({"Open": "first", "High": "max", "Low": "min", "Close": "last"}).dropna()
 
 
-def engine(o, h, l, c):
+def engine(o, h, l, c, cap=100):
     """Runs the indicator's zone rules candle by candle.
     Returns fresh demand zones, fresh supply zones, demand zones being tested by the latest candle,
     supply zones being tested by the latest candle, and the last close. Zones are (top, bottom, type): S single candle, M multi-candle legout, C multi-base continuation, G gap."""
@@ -73,7 +81,34 @@ def engine(o, h, l, c):
     tr = np.maximum(h - l, np.maximum(abs(h - prev), abs(l - prev)))
     atr = pd.Series(tr).ewm(alpha=1 / ATR_LEN, adjust=False).mean().values
     body, rng = abs(c - o), h - l
-    isb = (body < BASE_MULT * atr) | (USE_WICK & (rng > 0) & (body <= WICK_PCT * rng) & (rng <= WICK_RNG * atr))
+    shape_ok = (body <= SHAPE_PCT * rng) if USE_SHAPE else np.ones(n, dtype=bool)
+    isb = ((body < BASE_MULT * atr) & shape_ok) | (USE_WICK & (rng > 0) & (body <= WICK_PCT * rng) & (rng <= WICK_RNG * atr))
+
+    def ok_bull(i, k):      # the legout (candle i) must close above the legin (k candles back)
+        if not USE_CLOSE:
+            return True
+        return c[i] > (h[i - k] if CLOSE_FULL_RANGE else max(o[i - k], c[i - k]))
+
+    def ok_bear(i, k):
+        if not USE_CLOSE:
+            return True
+        return c[i] < (l[i - k] if CLOSE_FULL_RANGE else min(o[i - k], c[i - k]))
+
+    def dem_far(i, base_low, g, m):     # far edge of a demand zone: base low, or lower if a legout / red legin wick goes beyond
+        r = base_low
+        if USE_EXC:
+            r = min(base_low, l[i - m + 1:i + 1].min())
+            if c[i - g] < o[i - g]:
+                r = min(r, l[i - g])
+        return r
+
+    def sup_far(i, base_high, g, m):    # far edge of a supply zone: base high, or higher if a legout / green legin wick goes beyond
+        r = base_high
+        if USE_EXC:
+            r = max(base_high, h[i - m + 1:i + 1].max())
+            if c[i - g] > o[i - g]:
+                r = max(r, h[i - g])
+        return r
 
     dz, sz, lastD, lastS = [], [], -1, -1
     din, sin_ = [], []
@@ -127,22 +162,30 @@ def engine(o, h, l, c):
         sMulti = bearLen > 0 and not bearImp and (i - bearLen) != lastS
 
         if cBull:
-            dz.append((cd[0], cd[1], "C")); lastD = i - 1
+            if ok_bull(i, cBull + 1):
+                dz.append((cd[0], dem_far(i, cd[1], cBull + 1, 1), "C")); lastD = i - 1
         elif bullImp:
-            dz.append((max(o[i - 1], c[i - 1]), l[i - 1], "S")); lastD = i - 1
+            if ok_bull(i, 2):
+                dz.append((max(o[i - 1], c[i - 1]), dem_far(i, l[i - 1], 2, 1), "S")); lastD = i - 1
         elif dMulti:
-            j = i - bullLen; dz.append((max(o[j], c[j]), l[j], "M")); lastD = j
+            if ok_bull(i, bullLen + 1):
+                j = i - bullLen; dz.append((max(o[j], c[j]), dem_far(i, l[j], bullLen + 1, bullLen), "M")); lastD = j
         elif gapUp:
-            dz.append((max(o[i - 1], c[i - 1]), l[i - 1], "G")); lastD = i - 1
+            if ok_bull(i, 2):
+                dz.append((max(o[i - 1], c[i - 1]), dem_far(i, l[i - 1], 2, 1), "G")); lastD = i - 1
         if cBear:
-            sz.append((cs[0], cs[1], "C")); lastS = i - 1
+            if ok_bear(i, cBear + 1):
+                sz.append((sup_far(i, cs[0], cBear + 1, 1), cs[1], "C")); lastS = i - 1
         elif bearImp:
-            sz.append((h[i - 1], min(o[i - 1], c[i - 1]), "S")); lastS = i - 1
+            if ok_bear(i, 2):
+                sz.append((sup_far(i, h[i - 1], 2, 1), min(o[i - 1], c[i - 1]), "S")); lastS = i - 1
         elif sMulti:
-            j = i - bearLen; sz.append((h[j], min(o[j], c[j]), "M")); lastS = j
+            if ok_bear(i, bearLen + 1):
+                j = i - bearLen; sz.append((sup_far(i, h[j], bearLen + 1, bearLen), min(o[j], c[j]), "M")); lastS = j
         elif gapDn:
-            sz.append((h[i - 1], min(o[i - 1], c[i - 1]), "G")); lastS = i - 1
-        dz, sz = dz[-MAX_ZONES:], sz[-MAX_ZONES:]
+            if ok_bear(i, 2):
+                sz.append((sup_far(i, h[i - 1], 2, 1), min(o[i - 1], c[i - 1]), "G")); lastS = i - 1
+        dz, sz = dz[-cap:], sz[-cap:]
     return dz, sz, din, sin_, c[-1]
 
 
@@ -289,7 +332,7 @@ def main():
                 x = agg(d[COLS], tf).tail(KEEP[tf])
                 if len(x) < 20:
                     continue
-                dz, sz, din, sin_, c0 = engine(*[x[c].values for c in COLS])
+                dz, sz, din, sin_, c0 = engine(*[x[c].values for c in COLS], MAX_PER_TF[tf])
                 for side, z, st in pick(dz, sz, din, sin_, c0):
                     zl.append([tf, side, round(float(z[0]), 2), round(float(z[1]), 2), st, "", z[2]])
             v = round(float((d["Close"] * d["Volume"]).tail(20).mean() / 1e7), 2)
@@ -326,6 +369,8 @@ def main():
                 old = json.load(f)
         except Exception:
             old = None
+    if old and old.get("rules") != RULES_VERSION:
+        old = None      # zone rules changed since the last file, so yesterday's zones are not comparable
     if old and old.get("asof") == asof:
         base = old.get("base", {})
     elif old:
@@ -347,7 +392,7 @@ def main():
     with open("zones.json", "w") as f:
         json.dump({"universe": "NSE stocks", "generated": dt.datetime.now().isoformat(timespec="minutes"),
                    "asof": asof, "indices": {c: v[0] for c, v in INDICES.items()}, "base": base,
-                   "mood": mood, "top_sectors": [[g, sect[g]] for g in ranked[:5]],
+                   "rules": RULES_VERSION, "mood": mood, "top_sectors": [[g, sect[g]] for g in ranked[:5]],
                    "stocks": out}, f, separators=(",", ":"))
     print(f"Wrote zones.json with {len(out)} stocks, prices as of {asof}")
 
