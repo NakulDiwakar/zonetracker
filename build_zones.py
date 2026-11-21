@@ -3,9 +3,8 @@
 Setup:  pip install yfinance pandas numpy
 Run:    python build_zones.py          (about 750 stocks, tagged by index)
 
-Zone rules match your Pine indicator on Dhan: single base + explosive candle, multi-candle
-legout, continuation zones (rally-base-rally / drop-base-drop), gap zones, long-wick base candles, the base
-shape rule, the legout-must-close-beyond-legin rule, and the exceptional far-edge marking.
+Zone rules are the same as your TradingView indicator: single base + explosive candle, multi-candle
+legout, continuation zones (rally-base-rally / drop-base-drop), gap zones, and long-wick base candles.
 Timeframes: D, W, M, Q = calendar quarter, H = calendar half-year.
 
 For each stock and timeframe the file lists:
@@ -38,22 +37,10 @@ USE_WICK, WICK_PCT, WICK_RNG = True, 0.35, 1.5
 USE_MULTI, MULTI_MAX, MULTI_MULT, MULTI_MIN_BODY = True, 3, 1.5, 0.3
 USE_CONT, CONT_MAX, CONT_NEED_LEG, LEG_BARS, LEG_MULT, CONT_HEIGHT = True, 3, True, 3, 1.5, 2.5
 USE_GAPS, GAP_MULT, GAP_NEED_BASE = True, 0.3, False
-# ---- rules added to match the Pine indicator (Dhan) ----
-USE_SHAPE, SHAPE_PCT = True, 0.50             # a base candle's body may be at most this share of its range
-USE_CLOSE, CLOSE_FULL_RANGE = True, False     # the legout must close beyond the legin (body, or wick to wick if True)
-USE_EXC = True                                # far edge reaches a legin / legout wick that goes beyond the base
-# newest zones kept per side. The indicator keeps 100 on the chart's own timeframe and 10 per higher timeframe.
-# Set W, M, Q, H to 100 if you also want to see older untouched zones the chart no longer draws.
-MAX_PER_TF = {"D": 100, "W": 10, "M": 10, "Q": 10, "H": 10}
-RULES_VERSION = "3"                           # changes when the zone rules change, so old "new / closer" flags are not compared
-KEEP = {"D": 1500, "W": 600, "M": 400, "Q": 200, "H": 100}   # newest candles used per timeframe
+MAX_ZONES = 60
+KEEP = {"D": 1500, "W": 600, "M": 400, "Q": 200, "H": 100, "Y": 60}   # newest candles used per timeframe
 CLOSER_PCT = 0.2          # "got closer" = at least this many % points nearer than the previous day
 COLS = ["Open", "High", "Low", "Close"]
-
-# ---- market mood and strength settings ----
-VIX_CALM = 18        # India VIX below this counts as calm
-BREADTH_OK = 50      # at least this % of stocks above their 50-day average counts as healthy
-RS_DAYS = 63         # about 3 months of trading days, used for relative strength against Nifty
 
 
 def agg(df, tf):
@@ -64,12 +51,13 @@ def agg(df, tf):
     else:
         keys = {"M": [df.index.year, df.index.month],
                 "Q": [df.index.year, df.index.quarter],
-                "H": [df.index.year, (df.index.month > 6).astype(int)]}[tf]
+                "H": [df.index.year, (df.index.month > 6).astype(int)],
+                "Y": [df.index.year]}[tf]
         g = df.groupby(keys)
     return g.agg({"Open": "first", "High": "max", "Low": "min", "Close": "last"}).dropna()
 
 
-def engine(o, h, l, c, cap=100):
+def engine(o, h, l, c):
     """Runs the indicator's zone rules candle by candle.
     Returns fresh demand zones, fresh supply zones, demand zones being tested by the latest candle,
     supply zones being tested by the latest candle, and the last close. Zones are (top, bottom, type): S single candle, M multi-candle legout, C multi-base continuation, G gap."""
@@ -81,34 +69,7 @@ def engine(o, h, l, c, cap=100):
     tr = np.maximum(h - l, np.maximum(abs(h - prev), abs(l - prev)))
     atr = pd.Series(tr).ewm(alpha=1 / ATR_LEN, adjust=False).mean().values
     body, rng = abs(c - o), h - l
-    shape_ok = (body <= SHAPE_PCT * rng) if USE_SHAPE else np.ones(n, dtype=bool)
-    isb = ((body < BASE_MULT * atr) & shape_ok) | (USE_WICK & (rng > 0) & (body <= WICK_PCT * rng) & (rng <= WICK_RNG * atr))
-
-    def ok_bull(i, k):      # the legout (candle i) must close above the legin (k candles back)
-        if not USE_CLOSE:
-            return True
-        return c[i] > (h[i - k] if CLOSE_FULL_RANGE else max(o[i - k], c[i - k]))
-
-    def ok_bear(i, k):
-        if not USE_CLOSE:
-            return True
-        return c[i] < (l[i - k] if CLOSE_FULL_RANGE else min(o[i - k], c[i - k]))
-
-    def dem_far(i, base_low, g, m):     # far edge of a demand zone: base low, or lower if a legout / red legin wick goes beyond
-        r = base_low
-        if USE_EXC:
-            r = min(base_low, l[i - m + 1:i + 1].min())
-            if c[i - g] < o[i - g]:
-                r = min(r, l[i - g])
-        return r
-
-    def sup_far(i, base_high, g, m):    # far edge of a supply zone: base high, or higher if a legout / green legin wick goes beyond
-        r = base_high
-        if USE_EXC:
-            r = max(base_high, h[i - m + 1:i + 1].max())
-            if c[i - g] > o[i - g]:
-                r = max(r, h[i - g])
-        return r
+    isb = (body < BASE_MULT * atr) | (USE_WICK & (rng > 0) & (body <= WICK_PCT * rng) & (rng <= WICK_RNG * atr))
 
     dz, sz, lastD, lastS = [], [], -1, -1
     din, sin_ = [], []
@@ -162,30 +123,22 @@ def engine(o, h, l, c, cap=100):
         sMulti = bearLen > 0 and not bearImp and (i - bearLen) != lastS
 
         if cBull:
-            if ok_bull(i, cBull + 1):
-                dz.append((cd[0], dem_far(i, cd[1], cBull + 1, 1), "C")); lastD = i - 1
+            dz.append((cd[0], cd[1], "C")); lastD = i - 1
         elif bullImp:
-            if ok_bull(i, 2):
-                dz.append((max(o[i - 1], c[i - 1]), dem_far(i, l[i - 1], 2, 1), "S")); lastD = i - 1
+            dz.append((max(o[i - 1], c[i - 1]), l[i - 1], "S")); lastD = i - 1
         elif dMulti:
-            if ok_bull(i, bullLen + 1):
-                j = i - bullLen; dz.append((max(o[j], c[j]), dem_far(i, l[j], bullLen + 1, bullLen), "M")); lastD = j
+            j = i - bullLen; dz.append((max(o[j], c[j]), l[j], "M")); lastD = j
         elif gapUp:
-            if ok_bull(i, 2):
-                dz.append((max(o[i - 1], c[i - 1]), dem_far(i, l[i - 1], 2, 1), "G")); lastD = i - 1
+            dz.append((max(o[i - 1], c[i - 1]), l[i - 1], "G")); lastD = i - 1
         if cBear:
-            if ok_bear(i, cBear + 1):
-                sz.append((sup_far(i, cs[0], cBear + 1, 1), cs[1], "C")); lastS = i - 1
+            sz.append((cs[0], cs[1], "C")); lastS = i - 1
         elif bearImp:
-            if ok_bear(i, 2):
-                sz.append((sup_far(i, h[i - 1], 2, 1), min(o[i - 1], c[i - 1]), "S")); lastS = i - 1
+            sz.append((h[i - 1], min(o[i - 1], c[i - 1]), "S")); lastS = i - 1
         elif sMulti:
-            if ok_bear(i, bearLen + 1):
-                j = i - bearLen; sz.append((sup_far(i, h[j], bearLen + 1, bearLen), min(o[j], c[j]), "M")); lastS = j
+            j = i - bearLen; sz.append((h[j], min(o[j], c[j]), "M")); lastS = j
         elif gapDn:
-            if ok_bear(i, 2):
-                sz.append((sup_far(i, h[i - 1], 2, 1), min(o[i - 1], c[i - 1]), "G")); lastS = i - 1
-        dz, sz = dz[-cap:], sz[-cap:]
+            sz.append((h[i - 1], min(o[i - 1], c[i - 1]), "G")); lastS = i - 1
+        dz, sz = dz[-MAX_ZONES:], sz[-MAX_ZONES:]
     return dz, sz, din, sin_, c[-1]
 
 
@@ -232,81 +185,19 @@ def clean(df):
     return df
 
 
-def close_series(ticker):
-    """Daily closes for an index (Nifty 50 or India VIX). If the download fails, returns None and the build carries on."""
-    try:
-        x = yf.download(ticker, period="2y", interval="1d", auto_adjust=False, progress=False)
-        c = x["Close"]
-        if isinstance(c, pd.DataFrame):
-            c = c.iloc[:, 0]
-        return c.dropna()
-    except Exception as e:
-        print("Could not get", ticker, "-", e)
-        return None
-
-
-def ret_over(s, n):
-    """Percentage change over the last n candles."""
-    if s is None or len(s) <= n:
-        return None
-    return float(s.iloc[-1] / s.iloc[-1 - n] - 1) * 100
-
-
-def make_mood(nifty, vix, above50, total50):
-    """Simple market mood from three checks: Nifty above its 50-day average, breadth, and calm VIX."""
-    m, score, checks = {}, 0, 0
-    if nifty is not None and len(nifty) >= 50:
-        n = float(nifty.iloc[-1])
-        m["nifty"] = round(n, 1)
-        m["n50"] = round(float(nifty.tail(50).mean()), 1)
-        if len(nifty) >= 200:
-            m["n200"] = round(float(nifty.tail(200).mean()), 1)
-        checks += 1
-        score += int(n > m["n50"])
-    if total50:
-        pct = round(above50 / total50 * 100)
-        m["breadth"] = pct
-        checks += 1
-        score += int(pct >= BREADTH_OK)
-    if vix is not None and len(vix):
-        v = round(float(vix.iloc[-1]), 1)
-        m["vix"] = v
-        checks += 1
-        score += int(v < VIX_CALM)
-    m["score"], m["of"] = score, checks
-    if checks == 0:
-        m["label"] = "Unknown"
-    elif score == checks:
-        m["label"] = "Healthy"
-    elif score / checks >= 0.5:
-        m["label"] = "Mixed"
-    else:
-        m["label"] = "Weak"
-    return m
-
-
 def main():
     hdr = {"User-Agent": "Mozilla/5.0"}
     codes = {}
-    industry = {}
     for code, (name, fn) in INDICES.items():
         try:
             lst = pd.read_csv(BASE_URL + fn, storage_options=hdr)
-            has_ind = "Industry" in lst.columns
-            for _, row in lst.iterrows():
-                sym = str(row["Symbol"]).strip()
+            for sym in lst["Symbol"].astype(str).str.strip():
                 codes.setdefault(sym, []).append(code)
-                if has_ind:
-                    industry.setdefault(sym, str(row["Industry"]).strip())
         except Exception as e:
             print("Skipped", name, "-", e)
     if not codes:
         sys.exit("Could not download any index list")
     syms = sorted(codes)
-
-    nifty, vix = close_series("^NSEI"), close_series("^INDIAVIX")
-    nifty_ret = ret_over(nifty, RS_DAYS)
-    above50 = total50 = 0
 
     out = []
     kw = dict(interval="1d", group_by="ticker", auto_adjust=False, threads=True, progress=False)
@@ -328,38 +219,20 @@ def main():
             except Exception:
                 pass
             zl = []
-            for tf in ["D", "W", "M", "Q", "H"]:
+            for tf in ["D", "W", "M", "Q", "H", "Y"]:
                 x = agg(d[COLS], tf).tail(KEEP[tf])
                 if len(x) < 20:
                     continue
-                dz, sz, din, sin_, c0 = engine(*[x[c].values for c in COLS], MAX_PER_TF[tf])
+                dz, sz, din, sin_, c0 = engine(*[x[c].values for c in COLS])
                 for side, z, st in pick(dz, sz, din, sin_, c0):
                     zl.append([tf, side, round(float(z[0]), 2), round(float(z[1]), 2), st, "", z[2]])
             v = round(float((d["Close"] * d["Volume"]).tail(20).mean() / 1e7), 2)
-            cl = d["Close"]
-            if len(cl) >= 50:
-                total50 += 1
-                above50 += int(cl.iloc[-1] > cl.tail(50).mean())
-            sr = ret_over(cl, RS_DAYS)
-            rs = None if (sr is None or nifty_ret is None) else round(sr - nifty_ret, 1)
             out.append({"s": s_, "p": round(float(d["Close"].iloc[-1]), 2), "d": d.index[-1].date().isoformat(),
-                        "v": v, "i": codes[s_], "r": rs, "g": industry.get(s_, ""), "z": zl})
+                        "v": v, "i": codes[s_], "z": zl})
         print(f"Done {min(k + 100, len(syms))} of {len(syms)}")
         time.sleep(2)
 
     asof = max(x["d"] for x in out)
-
-    # Strength: each stock's 3-month return minus Nifty's ("r"), and sectors whose median stock is in the top third ("sg")
-    by_ind = {}
-    for rec in out:
-        if rec["r"] is not None and rec["g"]:
-            by_ind.setdefault(rec["g"], []).append(rec["r"])
-    sect = {g: round(float(np.median(v)), 1) for g, v in by_ind.items() if len(v) >= 3}
-    ranked = sorted(sect, key=sect.get, reverse=True)
-    top = set(ranked[:max(1, len(ranked) // 3)])
-    for rec in out:
-        rec["sg"] = 1 if rec["g"] in top else 0
-    mood = make_mood(nifty, vix, above50, total50)
 
     # Yesterday's baseline: the previous zones.json, or the baseline already kept if this is a same-day re-run
     old = None
@@ -369,8 +242,6 @@ def main():
                 old = json.load(f)
         except Exception:
             old = None
-    if old and old.get("rules") != RULES_VERSION:
-        old = None      # zone rules changed since the last file, so yesterday's zones are not comparable
     if old and old.get("asof") == asof:
         base = old.get("base", {})
     elif old:
@@ -392,7 +263,6 @@ def main():
     with open("zones.json", "w") as f:
         json.dump({"universe": "NSE stocks", "generated": dt.datetime.now().isoformat(timespec="minutes"),
                    "asof": asof, "indices": {c: v[0] for c, v in INDICES.items()}, "base": base,
-                   "rules": RULES_VERSION, "mood": mood, "top_sectors": [[g, sect[g]] for g in ranked[:5]],
                    "stocks": out}, f, separators=(",", ":"))
     print(f"Wrote zones.json with {len(out)} stocks, prices as of {asof}")
 

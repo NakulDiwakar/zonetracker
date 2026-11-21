@@ -3,135 +3,147 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Zone Proximity Tracker</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<title>Zone Scanner</title>
 <style>
-:root{--bg:#eef1f5;--panel:#fff;--ink:#16202c;--mute:#5c6b7c;--line:#d6dde6;--dem:#0f7b5f;--demBg:#dff3ec;--sup:#b3382c;--supBg:#fbe5e1;--acc:#27456b;
+:root{--bg:#f2f4f8;--card:#fff;--ink:#141c27;--mute:#5d6b7c;--line:#d5dce6;--acc:#f5c542;--accInk:#1a1400;--dem:#0f7b5f;--sup:#b3382c;--demBg:#dff3ec;--supBg:#fbe5e1;
 box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#0e141b;--panel:#161e28;--ink:#e6edf5;--mute:#93a1b2;--line:#263242;--dem:#4cc9a0;--demBg:#12332b;--sup:#ff8a7a;--supBg:#3a1b18;--acc:#8fb4e8}}
-:root[data-theme="dark"]{color-scheme:dark;--bg:#0e141b;--panel:#161e28;--ink:#e6edf5;--mute:#93a1b2;--line:#263242;--dem:#4cc9a0;--demBg:#12332b;--sup:#ff8a7a;--supBg:#3a1b18;--acc:#8fb4e8}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#0b1622;--card:#122234;--ink:#e8eef6;--mute:#8fa1b5;--line:#243a52;--dem:#4cc9a0;--sup:#ff8a7a;--demBg:#12332b;--supBg:#3a1b18}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#0b1622;--card:#122234;--ink:#e8eef6;--mute:#8fa1b5;--line:#243a52;--dem:#4cc9a0;--sup:#ff8a7a;--demBg:#12332b;--supBg:#3a1b18}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 *,*::before,*::after{box-sizing:inherit}
-body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.5 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
-main{max-width:1040px;margin:0 auto;padding:20px 16px 40px}
-h1{font-size:26px;line-height:1.2;margin:8px 0 4px;font-weight:600;letter-spacing:-.01em}
-.lede{color:var(--mute);margin:0 0 16px;max-width:60ch}
-.bar{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-bottom:12px}
-.btn{display:inline-block;background:var(--acc);color:var(--panel);padding:8px 14px;border-radius:6px;font-weight:500;cursor:pointer}
-.btn:focus-within{outline:2px solid var(--ink);outline-offset:2px}
-.btn input{position:absolute;opacity:0;width:1px;height:1px}
-#msg{color:var(--mute);font-size:14px}
-.filters{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px;display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin-bottom:12px}
-.filters label,.filters .lbl{display:block;font-size:13px;color:var(--mute);margin-bottom:4px}
-.filters select,.filters input[type=search]{width:100%;padding:7px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit}
-.filters input[type=range]{width:100%}
-.tfs{display:flex;flex-wrap:wrap;gap:6px}
-.tfs label{display:inline-flex;gap:5px;align-items:center;margin:0;padding:4px 9px;border:1px solid var(--line);border-radius:999px;color:var(--ink);cursor:pointer}
-.tfs input:checked+span{font-weight:600}
-.wrap{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px}
-table{border-collapse:collapse;width:100%;min-width:760px}
-th,td{padding:9px 10px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top;white-space:nowrap}
-th{font-weight:500;color:var(--mute);font-size:13px}
-tr:last-child td{border-bottom:0}
-td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
-td.s{font-weight:600}
-.tag{padding:2px 8px;border-radius:4px;font-size:13px;font-weight:500}
-.tag.D{background:var(--demBg);color:var(--dem)}.tag.S{background:var(--supBg);color:var(--sup)}
-td.c b{display:block;font-variant-numeric:tabular-nums}
-td.c small{color:var(--mute);font-variant-numeric:tabular-nums}
-td.c.D b{color:var(--dem)}td.c.S b{color:var(--sup)}
-.none{color:var(--mute)}
-.bd{font-style:normal;font-size:11px;font-weight:500;padding:1px 5px;border-radius:4px;background:var(--line);color:var(--ink);margin-left:3px}
-.sub{display:block;font-weight:400;font-size:12px;color:var(--mute)}
-.empty{padding:28px 16px;text-align:center;color:var(--mute)}
-.note{color:var(--mute);font-size:13px;margin-top:12px;max-width:70ch}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:980px;margin:0 auto;padding:18px 14px 40px}
+h1{margin:6px 0 2px;font-size:26px;text-align:center}
+.sub{text-align:center;color:var(--mute);margin:0 0 14px;font-size:14px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--mute);margin-right:5px}
+.dot.on{background:var(--dem)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.lbl{font-size:12px;color:var(--mute);margin:0 0 4px 2px}
+.seg{display:flex;border:1.5px solid var(--line);border-radius:12px;padding:3px;gap:3px;background:var(--card)}
+.seg button{flex:1;border:0;border-radius:9px;padding:9px 6px;font:500 14px inherit;font-family:inherit;background:transparent;color:var(--ink);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--acc);color:var(--accInk);font-weight:600}
+.tabs{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line);margin:4px 0 12px;-webkit-overflow-scrolling:touch}
+.tabs button{flex:0 0 auto;border:0;background:transparent;color:var(--mute);padding:10px 12px;font:500 15px inherit;font-family:inherit;border-bottom:3px solid transparent;cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--acc);font-weight:600}
+details{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:12px}
+summary{cursor:pointer;color:var(--mute);font-size:14px}
+.fg{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:10px}
+.fg select,.fg input[type=search]{width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
+.fg input[type=range]{width:100%}
+.chk{display:flex;flex-wrap:wrap;gap:6px}
+.chk label{display:inline-flex;gap:4px;align-items:center;border:1px solid var(--line);border-radius:999px;padding:3px 9px;font-size:13px}
+.count{color:var(--mute);font-size:13px;margin:0 2px 8px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+.tile{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--dem);border-radius:12px;padding:10px 11px}
+.tile.S{border-left-color:var(--sup)}
+.tile .sym{font-weight:700;font-size:15px;overflow-wrap:anywhere}
+.tile .px{color:var(--mute);font-size:13px;font-variant-numeric:tabular-nums}
+.tile .dist{font-size:20px;font-weight:700;margin:4px 0 2px;color:var(--dem)}
+.tile.S .dist{color:var(--sup)}
+.tile.in{background:var(--demBg)}
+.tile.in.S{background:var(--supBg)}
+.tile .rng{font-size:12px;color:var(--mute);font-variant-numeric:tabular-nums}
+.chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.chips i{font-style:normal;font-size:11px;font-weight:600;padding:1px 6px;border-radius:5px;background:var(--line);color:var(--ink)}
+.chips i.n{background:var(--acc);color:var(--accInk)}
+.empty{padding:30px 10px;text-align:center;color:var(--mute)}
+.note{color:var(--mute);font-size:12.5px;margin-top:14px}
 </style>
 </head>
 <body>
 <main>
-<h1>Zone Proximity Tracker</h1>
-<p class="lede">Stocks sitting close to a fresh demand or supply zone on the daily, weekly, monthly, quarterly and half-yearly charts.</p>
-<div class="bar">
-<label class="btn">Load zones.json<input type="file" id="f" accept=".json,application/json"></label>
-<span id="msg"></span>
+<h1>Zone Scanner</h1>
+<p class="sub"><span class="dot" id="dot"></span><span id="status">Loading</span></p>
+
+<div class="row">
+ <div><p class="lbl">Select criteria</p><div class="seg" data-k="crit"><button data-v="A" aria-pressed="true">Approaching</button><button data-v="I" aria-pressed="false">In zone</button></div></div>
+ <div><p class="lbl">Select zone type</p><div class="seg" data-k="side"><button data-v="D" aria-pressed="true">Demand</button><button data-v="S" aria-pressed="false">Supply</button></div></div>
 </div>
-<section class="filters" aria-label="Filters">
-<div><span class="lbl">Timeframes</span><div class="tfs" id="tfs"></div></div>
-<div><span class="lbl">Zone types (untick to hide)</span><div class="tfs" id="tys"></div></div>
-<div><label for="side">Zone type</label><select id="side"><option value="B">Demand and supply</option><option value="D">Demand only</option><option value="S">Supply only</option></select></div>
-<div><label for="th">Within <b id="thv"></b> of the zone</label><input type="range" id="th" min="0.5" max="10" step="0.5" value="3"></div>
-<div><label for="minc">Timeframes that must match</label><select id="minc"><option value="1">At least 1</option><option value="2">At least 2</option><option value="3">At least 3</option></select></div>
-<div><label for="ix">Index</label><select id="ix"></select></div>
-<div><label for="st">Zone status</label><select id="st"><option value="F">Approaching (not touched yet)</option><option value="I">Inside now (price is in the zone)</option><option value="A">Both</option></select></div>
-<div><label for="chg">What changed since yesterday</label><select id="chg"><option value="">Show all</option><option value="N">New zones only</option><option value="C">Got closer only</option><option value="NC">New or got closer</option></select></div>
-<div><label for="liq">Minimum daily traded value</label><select id="liq"><option value="0">Any</option><option value="1">Rs 1 crore</option><option value="5">Rs 5 crore</option><option value="20">Rs 20 crore</option><option value="50">Rs 50 crore</option></select></div>
-<div><label for="q">Search stock</label><input type="search" id="q" placeholder="e.g. RELIANCE"></div>
-</section>
-<div class="wrap"><table><thead><tr><th>Stock</th><th class="n">Price</th><th>Zone</th><th>Daily</th><th>Weekly</th><th>Monthly</th><th>Quarterly</th><th>Half-yearly</th><th class="n">Matches</th></tr></thead><tbody id="rows"></tbody></table><div id="empty" class="empty" hidden>No stock is within that distance. Widen the distance or select more timeframes.</div></div>
-<p class="note">Distance is measured from the current price to the zone's entry edge: the top of a demand zone, the bottom of a supply zone. Approaching zones are fresh, meaning price has not touched them yet. Inside means the latest price is sitting within the zone. A zone that price touched and then bounced away from is hidden, because it has already done its work. New and Closer compare with the previous trading day. Each cell shows the distance and the zone range.</p>
+
+<div class="tabs" role="tablist" id="tabs"></div>
+
+<details>
+ <summary>More filters</summary>
+ <div class="fg">
+  <div><p class="lbl">Within <b id="thv"></b> of the zone</p><input type="range" id="th" min="0.5" max="15" step="0.5" value="5"></div>
+  <div><p class="lbl">Index</p><select id="ix"></select></div>
+  <div><p class="lbl">Minimum daily traded value</p><select id="liq"><option value="0">Any</option><option value="1">Rs 1 crore</option><option value="5">Rs 5 crore</option><option value="20">Rs 20 crore</option><option value="50">Rs 50 crore</option></select></div>
+  <div><p class="lbl">What changed since yesterday</p><select id="chg"><option value="">Show all</option><option value="N">New zones only</option><option value="C">Got closer only</option><option value="NC">New or got closer</option></select></div>
+  <div><p class="lbl">Search stock</p><input type="search" id="q" placeholder="e.g. RELIANCE"></div>
+  <div><p class="lbl">Zone types (untick to hide)</p><div class="chk" id="tys"></div></div>
+ </div>
+</details>
+
+<p class="count" id="count"></p>
+<div class="grid" id="grid"></div>
+<div class="empty" id="empty" hidden>No stock matches. Try a wider distance, another timeframe, or untick fewer zone types.</div>
+<p class="note">Distance is from the live price to the zone's entry edge (top of a demand zone, bottom of a supply zone). Only fresh zones are listed. "In zone" means the live price is inside the zone range. Zones are rebuilt each evening and prices refresh about every 5 to 10 minutes while the market is open. Prices come from a free source and can be delayed.</p>
 </main>
 <script>
 const $=s=>document.querySelector(s);
-const TF=["D","W","M","Q","H"],NM={D:"Daily",W:"Weekly",M:"Monthly",Q:"Quarterly",H:"Half-yearly"};
-const sel=new Set(TF);
-const TY={S:"Single candle",M:"Multi-candle legout",C:"Multi-base (continuation)",G:"Gap"},TS={S:"single",M:"multi-candle",C:"multi-base",G:"gap"};
+const TFS=[["D","Daily"],["W","Weekly"],["M","Monthly"],["Q","Quarterly"],["H","Half-yearly"],["Y","Yearly"]];
+const TY={S:"Single candle",M:"Multi-candle legout",C:"Multi-base",G:"Gap"},TS={S:"single",M:"multi-candle",C:"multi-base",G:"gap"};
 const typ=new Set(Object.keys(TY));
+const S={crit:"A",side:"D",tf:"D"};
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const sample={universe:"Sample data",generated:"fictional numbers, load your own file",stocks:[
-{s:"DEMO ALPHA",p:1000,z:[["D","D",985,970],["W","D",972,940],["M","D",962,900],["D","S",1030,1022]]},
-{s:"DEMO BETA",p:250,z:[["D","S",255,252],["W","S",258,253],["Q","S",262,255],["H","D",200,180]]},
-{s:"DEMO GAMMA",p:540,z:[["D","D",530,520],["H","D",528,470],["W","S",600,585]]},
-{s:"DEMO DELTA",p:88,z:[["M","S",90,88.4],["Q","S",93,89],["D","D",70,66]]}]};
-let data=sample;
-try{const s=localStorage.getItem("zt");if(s){const d=JSON.parse(s);if(d&&Array.isArray(d.stocks))data=d}}catch(e){}
-$("#tfs").innerHTML=TF.map(t=>`<label><input type="checkbox" value="${t}" checked><span>${NM[t]}</span></label>`).join("");
-$("#tfs").addEventListener("change",e=>{e.target.checked?sel.add(e.target.value):sel.delete(e.target.value);render()});
-$("#tys").innerHTML=Object.entries(TY).map(([k,n])=>`<label><input type="checkbox" value="${k}" checked><span>${n}</span></label>`).join("");
+const sample={universe:"Sample data",asof:"fictional numbers",indices:{},stocks:[
+{s:"DEMO ALPHA",p:1000,v:12,i:[],z:[["D","D",985,970,"F","N","S"],["W","D",990,940,"F","","M"],["D","S",1030,1022,"F","","S"]]},
+{s:"DEMO BETA",p:247,v:8,i:[],z:[["D","D",249,240,"I","","S"],["M","D",252,200,"F","C","C"]]},
+{s:"DEMO GAMMA",p:540,v:30,i:[],z:[["D","D",530,520,"F","","G"],["Q","D",528,470,"F","","S"]]}]};
+let data=sample,live=null;
+
+$("#tabs").innerHTML=TFS.map(([k,n])=>`<button role="tab" data-t="${k}" aria-selected="${k===S.tf}">${n}</button>`).join("");
+$("#tabs").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;S.tf=b.dataset.t;[...$("#tabs").children].forEach(x=>x.setAttribute("aria-selected",x===b));render()});
+document.querySelectorAll(".seg").forEach(g=>g.addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;S[g.dataset.k]=b.dataset.v;[...g.children].forEach(x=>x.setAttribute("aria-pressed",x===b));render()}));
+$("#tys").innerHTML=Object.entries(TY).map(([k,n])=>`<label><input type="checkbox" value="${k}" checked>${n}</label>`).join("");
 $("#tys").addEventListener("change",e=>{e.target.checked?typ.add(e.target.value):typ.delete(e.target.value);render()});
-["side","th","minc","q","ix","st","chg","liq"].forEach(id=>$("#"+id).addEventListener("input",render));
-$("#f").addEventListener("change",e=>{
- const f=e.target.files[0];if(!f)return;
- f.text().then(t=>{try{const d=JSON.parse(t);if(!Array.isArray(d.stocks))throw 0;data=d;try{localStorage.setItem("zt",JSON.stringify(d))}catch(x){}render()}
- catch(x){$("#msg").textContent="That file is not a zones.json made by build_zones.py."}});
-});
-function fillIx(){
- const cur=$("#ix").value,ix=data.indices||{};
- $("#ix").innerHTML='<option value="">All stocks</option>'+Object.entries(ix).map(([c,n])=>`<option value="${c}">${esc(n)}</option>`).join("");
- $("#ix").value=cur;fillIx.k=data;
-}
+["th","ix","liq","chg","q"].forEach(id=>$("#"+id).addEventListener("input",render));
+
+function fillIx(){const cur=$("#ix").value,ix=data.indices||{};$("#ix").innerHTML='<option value="">All stocks</option>'+Object.entries(ix).map(([c,n])=>`<option value="${c}">${esc(n)}</option>`).join("");$("#ix").value=cur;fillIx.k=data}
+
 function render(){
  if(fillIx.k!==data)fillIx();
- const th=+$("#th").value,side=$("#side").value,minc=+$("#minc").value,q=$("#q").value.trim().toLowerCase(),ix=$("#ix").value,stv=$("#st").value,chg=$("#chg").value,liq=+$("#liq").value;
+ const th=+$("#th").value,ix=$("#ix").value,liq=+$("#liq").value,chg=$("#chg").value,q=$("#q").value.trim().toLowerCase();
  $("#thv").textContent=th.toFixed(1)+"%";
- $("#msg").textContent=data.universe+", prices as of "+(data.asof||data.generated)+", "+data.stocks.length+" stocks";
  const rows=[];
  for(const st of data.stocks){
   if(q&&!st.s.toLowerCase().includes(q))continue;
   if(ix&&!(st.i||[]).includes(ix))continue;
   if(liq&&(st.v||0)<liq)continue;
-  for(const sd of ["D","S"]){
-   if(side!=="B"&&side!==sd)continue;
-   const hits={};
-   for(const [tf,s,top,bot,sx,fl,ty] of st.z){
-    if(s!==sd||!sel.has(tf))continue;
-    if(ty&&!typ.has(ty))continue;
-    const inside=sx==="I";
-    if((stv==="F"&&inside)||(stv==="I"&&!inside))continue;
-    if((chg==="N"&&fl!=="N")||(chg==="C"&&fl!=="C")||(chg==="NC"&&!fl))continue;
-    const d=inside?0:(sd==="D"?(st.p-top)/st.p*100:(bot-st.p)/st.p*100);
-    if(d>=0&&d<=th&&(!hits[tf]||d<hits[tf].d))hits[tf]={d,top,bot,inside,fl,ty};
-   }
-   const n=Object.keys(hits).length;
-   if(n>0&&n>=minc)rows.push({st,sd,hits,n,near:Math.min(...Object.values(hits).map(h=>h.d))});
+  const p=live&&live.p[st.s]!=null?live.p[st.s]:st.p;
+  let best=null;const others={};
+  for(const [tf,sd,top,bot,sx,fl,ty] of st.z){
+   if(sd!==S.side)continue;
+   if(ty&&!typ.has(ty))continue;
+   const inside=p>=bot&&p<=top;
+   if(S.side==="D"?p<bot:p>top)continue;
+   const d=inside?0:(S.side==="D"?(p-top)/p*100:(bot-p)/p*100);
+   const ok=S.crit==="I"?inside:(!inside&&d<=th);
+   if(!ok)continue;
+   if(tf!==S.tf){others[tf]=1;continue}
+   if(chg==="N"&&fl!=="N"||chg==="C"&&fl!=="C"||chg==="NC"&&!fl)continue;
+   if(!best||d<best.d)best={d,top,bot,inside,fl,ty};
   }
+  if(best)rows.push({st,p,best,others});
  }
- rows.sort((a,b)=>b.n-a.n||a.near-b.near);
- $("#rows").innerHTML=rows.map(r=>`<tr><td class="s">${esc(r.st.s)}${r.st.v?`<span class="sub">Rs ${r.st.v} Cr/day</span>`:""}</td><td class="n">${r.st.p.toFixed(2)}${r.st.d&&data.asof&&r.st.d<data.asof?`<small class="none" title="Last price from ${r.st.d}"> *</small>`:""}</td><td><span class="tag ${r.sd}">${r.sd==="D"?"Demand":"Supply"}</span></td>`+
-  TF.map(t=>{const h=r.hits[t];return h?`<td class="c ${r.sd}"><b>${h.inside?"Inside":h.d.toFixed(1)+"%"}${h.fl==="N"?'<i class="bd">New</i>':h.fl==="C"?'<i class="bd">Closer</i>':""}</b><small>${h.bot}–${h.top}${h.ty?" "+TS[h.ty]:""}</small></td>`:`<td class="none">–</td>`}).join("")+
-  `<td class="n">${r.n}</td></tr>`).join("");
+ rows.sort((a,b)=>a.best.d-b.best.d);
+ $("#grid").innerHTML=rows.map(r=>{
+  const b=r.best,oth=Object.keys(r.others).map(t=>`<i>${t}</i>`).join("");
+  return `<div class="tile ${S.side} ${b.inside?"in":""}"><div class="sym">${esc(r.st.s)}</div><div class="px">${r.p.toFixed(2)}</div>
+  <div class="dist">${b.inside?"In zone":b.d.toFixed(1)+"% away"}</div>
+  <div class="rng">${b.bot} – ${b.top}${b.ty?" · "+TS[b.ty]:""}</div>
+  <div class="chips">${b.fl==="N"?'<i class="n">New</i>':b.fl==="C"?'<i class="n">Closer</i>':""}${oth}</div></div>`}).join("");
  $("#empty").hidden=rows.length>0;
+ $("#count").textContent=rows.length+" stocks";
+ const asof=live?live.t.replace("T"," ").slice(0,16):data.asof;
+ $("#status").textContent="Scanning "+data.stocks.length+" stocks, prices "+(live?"live, updated "+asof:"as of "+asof);
+ $("#dot").className="dot"+(live?" on":"");
 }
-fetch("zones.json",{cache:"no-store"}).then(r=>r.ok?r.json():Promise.reject()).then(d=>{if(d&&Array.isArray(d.stocks)){data=d;render()}}).catch(()=>{});
+
+try{const s=localStorage.getItem("zt");if(s){const d=JSON.parse(s);if(d&&Array.isArray(d.stocks))data=d}}catch(e){}
+fetch("zones.json",{cache:"no-store"}).then(r=>r.ok?r.json():Promise.reject()).then(d=>{if(d&&Array.isArray(d.stocks)){data=d;try{localStorage.setItem("zt",JSON.stringify(d))}catch(e){}render()}}).catch(()=>{});
+async function pull(){try{const r=await fetch("live.json?t="+Date.now(),{cache:"no-store"});if(r.ok){const j=await r.json();if(j&&j.p){live=j;render()}}}catch(e){}}
+pull();setInterval(pull,60000);
 render();
 </script>
 </body>
