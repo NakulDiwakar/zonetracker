@@ -41,6 +41,37 @@ MAX_ZONES = 60
 KEEP = {"D": 1500, "W": 600, "M": 400, "Q": 200, "H": 100, "Y": 60}   # newest candles used per timeframe
 CLOSER_PCT = 0.2          # "got closer" = at least this many % points nearer than the previous day
 COLS = ["Open", "High", "Low", "Close"]
+EMA_LEN, EMA_MIN_RUN, EMA_MAX_GAP, EMA_RECENT = 20, 10, 12.0, 5
+
+
+def ema_watch(c, h):
+    """20 EMA watch (daily). Returns [kind, run, gap, age, ema] or None.
+    kind "A": price has stayed below the 20 EMA (the daily high never reached it) for `run` bars; gap = % below the EMA.
+    kind "T": price touched the EMA for the first time after `run` bars below it; `age` = bars since that touch ended."""
+    n = len(c)
+    if n < EMA_LEN + EMA_MIN_RUN + 5:
+        return None
+    e = pd.Series(c).ewm(span=EMA_LEN, adjust=False).mean().values
+    touch = h >= e
+    idx = np.flatnonzero(touch)
+    gap = float((e[-1] - c[-1]) / e[-1] * 100)
+    em = round(float(e[-1]), 2)
+    if len(idx) == 0:
+        return ["A", n, round(gap, 2), 0, em] if 0 <= gap <= EMA_MAX_GAP else None
+    last = int(idx[-1])
+    start = last
+    while start > 0 and touch[start - 1]:
+        start -= 1
+    if n - 1 - start <= EMA_RECENT:
+        prev = idx[idx < start]
+        run = (start - 1 - int(prev[-1])) if len(prev) else start
+        if run >= EMA_MIN_RUN and abs(gap) <= EMA_MAX_GAP:
+            return ["T", run, round(gap, 2), n - 1 - last, em]
+        return None
+    run = n - 1 - last
+    if run >= EMA_MIN_RUN and 0 <= gap <= EMA_MAX_GAP:
+        return ["A", run, round(gap, 2), 0, em]
+    return None
 
 
 def agg(df, tf):
@@ -228,7 +259,8 @@ def main():
                     zl.append([tf, side, round(float(z[0]), 2), round(float(z[1]), 2), st, "", z[2]])
             v = round(float((d["Close"] * d["Volume"]).tail(20).mean() / 1e7), 2)
             out.append({"s": s_, "p": round(float(d["Close"].iloc[-1]), 2), "d": d.index[-1].date().isoformat(),
-                        "v": v, "i": codes[s_], "z": zl})
+                        "v": v, "i": codes[s_], "z": zl,
+                        "e": ema_watch(d["Close"].values, d["High"].values)})
         print(f"Done {min(k + 100, len(syms))} of {len(syms)}")
         time.sleep(2)
 
