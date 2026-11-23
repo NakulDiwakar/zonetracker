@@ -1,8 +1,12 @@
 """Probe for NSE's free "CM Market Live" MCP server. It only READS data and changes nothing.
 It prints the server's tools, how fresh its data is, and a few quotes, so we can see what is possible."""
 import asyncio, json
+from importlib.metadata import version
 from mcp import ClientSession
-from mcp.client.streamable_http import streamablehttp_client
+try:  # the library renamed this function in newer versions, so accept either name
+    from mcp.client.streamable_http import streamablehttp_client as connect
+except ImportError:
+    from mcp.client.streamable_http import streamable_http_client as connect
 
 URL = "https://mcp.nseindia.in/cmmkt/mcp"
 SYMBOLS = ["RELIANCE", "TCS", "GRANULES"]
@@ -15,7 +19,8 @@ def show(result):
 
 
 async def main():
-    async with streamablehttp_client(URL) as (read, write, _):
+    print("mcp library version:", version("mcp"))
+    async with connect(URL) as (read, write, _):
         async with ClientSession(read, write) as session:
             await session.initialize()
             tools = await session.list_tools()
