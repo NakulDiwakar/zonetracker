@@ -20,7 +20,8 @@ def show(result):
 
 async def main():
     print("mcp library version:", version("mcp"))
-    async with connect(URL) as (read, write, _):
+    async with connect(URL) as streams:
+        read, write = streams[0], streams[1]  # older versions return 3 items, newer ones 2
         async with ClientSession(read, write) as session:
             await session.initialize()
             tools = await session.list_tools()
