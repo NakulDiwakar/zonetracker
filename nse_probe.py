@@ -27,16 +27,20 @@ async def main():
             tools = await session.list_tools()
             print("TOOLS FOUND:", len(tools.tools))
             for t in tools.tools:
-                print("-", t.name, "|", (t.description or "")[:120].replace("\n", " "))
-                print("    inputs:", json.dumps((t.inputSchema or {}).get("properties", {}))[:300])
+                schema = getattr(t, "input_schema", None) or getattr(t, "inputSchema", None) or {}
+                print("-", t.name, "|", (t.description or "")[:700].replace("\n", " "))
+                print("    inputs:", json.dumps(schema.get("properties", {}))[:500])
             names = {t.name for t in tools.tools}
-            if "cm_get_data_status" in names:
-                print("\nDATA STATUS")
-                show(await session.call_tool("cm_get_data_status", {}))
-            if "cm_get_stock_quote" in names:
-                for s in SYMBOLS:
-                    print("\nQUOTE", s)
-                    show(await session.call_tool("cm_get_stock_quote", {"symbol": s}))
+            try:
+                if "cm_get_data_status" in names:
+                    print("\nDATA STATUS")
+                    show(await session.call_tool("cm_get_data_status", {}))
+                if "cm_get_stock_quote" in names:
+                    for s in SYMBOLS:
+                        print("\nQUOTE", s)
+                        show(await session.call_tool("cm_get_stock_quote", {"symbol": s}))
+            except Exception as e:
+                print("Tool call failed:", repr(e)[:500])
 
 
 asyncio.run(main())
