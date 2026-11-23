@@ -85,7 +85,7 @@ summary{cursor:pointer;color:var(--mute);font-size:14px}
 <p class="count" id="count"></p>
 <div class="grid" id="grid"></div>
 <div class="empty" id="empty" hidden>No stock matches. Try a wider distance, another timeframe, or untick fewer zone types.</div>
-<p class="note">Distance is from the live price to the zone's entry edge (top of a demand zone, bottom of a supply zone). Only fresh zones are listed. "In zone" means the live price is inside the zone range. Zones are rebuilt each evening and prices refresh about every 5 to 10 minutes while the market is open. Prices come from a free source and can be delayed.</p>
+<p class="note">Distance is from the live price to the zone's entry edge (top of a demand zone, bottom of a supply zone). Only fresh zones are listed. "In zone" means the live price is inside the zone range. Zones are rebuilt each evening and prices refresh about every 5 to 10 minutes while the market is open. Live prices come from NSE's free data service, about 1 to 2 minutes behind, with Yahoo Finance as a backup for any stock NSE does not return. Prices can be delayed, so always confirm on your broker chart before trading.</p>
 </main>
 <script>
 const $=s=>document.querySelector(s);
@@ -147,7 +147,7 @@ function render(){
  $("#empty").hidden=rows.length>0;
  $("#count").textContent=rows.length+" stocks";
  const asof=live?live.t.replace("T"," ").slice(0,16):data.asof;
- $("#status").textContent="Scanning "+data.stocks.length+" stocks, prices "+(live?"live, updated "+asof:"as of "+asof);
+ $("#status").textContent="Scanning "+data.stocks.length+" stocks, prices "+(live?"live"+(live.src?" from "+live.src:"")+", updated "+asof:"as of "+asof);
  $("#dot").className="dot"+(live?" on":"");
 }
 
@@ -181,7 +181,7 @@ function renderEma(){
  $("#empty").textContent="No stock matches yet. Try fewer days below the EMA or a wider distance. The list is rebuilt each evening.";
  $("#count").textContent=rows.length+" stocks to watch. Daily chart, a watchlist and not a signal.";
  const asof=live?live.t.replace("T"," ").slice(0,16):data.asof;
- $("#status").textContent="Scanning "+data.stocks.length+" stocks, prices "+(live?"live, updated "+asof:"as of "+asof);
+ $("#status").textContent="Scanning "+data.stocks.length+" stocks, prices "+(live?"live"+(live.src?" from "+live.src:"")+", updated "+asof:"as of "+asof);
  $("#dot").className="dot"+(live?" on":"");
 }
 
